@@ -660,7 +660,7 @@ async function updateOrderStatus(id, status) {
 }
 
 // ============================================================
-//      ADMIN DASHBOARD (Updated with Membership Logic)
+//      ADMIN DASHBOARD (Updated with Status Toggle)
 // ============================================================
 
 async function renderAdminDash() {
@@ -687,32 +687,59 @@ async function renderAdminDash() {
 async function fetchUsers() {
     users = await apiCall('/users');
     const el = document.getElementById('users-table');
-    el.innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Action</th></tr></thead><tbody>` +
-    (Array.isArray(users) ? users.map(u => `<tr>
-        <td>${u.name}</td><td>${u.email}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}')">Remove</button></td>
-    </tr>`).join('') : '') + `</tbody></table>`;
+    
+    if (!Array.isArray(users)) { el.innerHTML = '<p>No users found.</p>'; return; }
+
+    el.innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Action</th></tr></thead><tbody>` +
+    users.map(u => {
+        const isInactive = u.status === 'inactive';
+        return `<tr>
+        <td>${u.name}</td>
+        <td>${u.email}</td>
+        <td><span class="badge ${isInactive ? 'badge-danger' : 'badge-success'}">${u.status || 'active'}</span></td>
+        <td>
+            <button class="btn btn-sm ${isInactive ? 'btn-success' : 'btn-danger'}" 
+                onclick="toggleStatus('${u._id}', '${isInactive ? 'active' : 'inactive'}')">
+                ${isInactive ? 'Activate' : 'Deactivate'}
+            </button>
+        </td>
+    </tr>`}).join('') + `</tbody></table>`;
 }
 
 async function fetchVendors() {
     vendors = await apiCall('/vendors');
     const el = document.getElementById('vendors-table');
-    el.innerHTML = `<table><thead><tr><th>Name</th><th>Membership</th><th>Action</th></tr></thead><tbody>` +
-    (Array.isArray(vendors) ? vendors.map(v => `<tr>
+
+    if (!Array.isArray(vendors)) { el.innerHTML = '<p>No vendors found.</p>'; return; }
+
+    el.innerHTML = `<table><thead><tr><th>Name</th><th>Membership</th><th>Status</th><th>Action</th></tr></thead><tbody>` +
+    vendors.map(v => {
+        const isInactive = v.status === 'inactive';
+        return `<tr>
         <td>${v.name}</td>
-        <td><span class="badge ${v.membershipId ? 'badge-success':'badge-warning'}">${v.membershipId ? 'Premium' : 'Standard'}</span></td>
+        <td><span class="badge ${v.membershipId ? 'badge-accent' : 'badge-warning'}">${v.membershipId ? 'Premium' : 'Standard'}</span></td>
+        <td><span class="badge ${isInactive ? 'badge-danger' : 'badge-success'}">${v.status || 'active'}</span></td>
         <td>
             <button class="btn btn-primary btn-sm" onclick="assignMembership('${v._id}')">Upgrade</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteUser('${v._id}')">Remove</button>
+            <button class="btn btn-sm ${isInactive ? 'btn-success' : 'btn-danger'}" 
+                onclick="toggleStatus('${v._id}', '${isInactive ? 'active' : 'inactive'}')">
+                ${isInactive ? 'Activate' : 'Deactivate'}
+            </button>
         </td>
-    </tr>`).join('') : '') + `</tbody></table>`;
+    </tr>`}).join('') + `</tbody></table>`;
 }
 
-async function deleteUser(id) {
-    if(confirm("Permanently delete this user/vendor?")) {
-        await apiCall(`/users/${id}`, 'DELETE');
-        fetchUsers();
-        fetchVendors();
+// 🔴 NEW FUNCTION: Handles the logic to change status
+async function toggleStatus(userId, newStatus) {
+    if(confirm(`Are you sure you want to make this user ${newStatus}?`)) {
+        const res = await apiCall(`/users/${userId}/status`, 'PUT', { status: newStatus });
+        if (res.success) {
+            // Refresh tables to reflect changes
+            fetchUsers();
+            fetchVendors();
+        } else {
+            alert("Failed to update status");
+        }
     }
 }
 
@@ -722,7 +749,6 @@ async function assignMembership(vendorId) {
         fetchVendors();
     }
 }
-
 async function fetchAllOrders() {
     const ords = await apiCall('/orders');
     const el = document.getElementById('admin-orders-table');

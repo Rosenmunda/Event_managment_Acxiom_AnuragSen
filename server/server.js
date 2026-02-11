@@ -195,6 +195,14 @@ app.get('/api/vendors', async (req, res) => {
     const vendors = await User.find({ role: 'vendor' });
     res.json(vendors);
 });
+// Admin: Toggle Status (Active/Inactive)
+app.put('/api/users/:id/status', async (req, res) => {
+    try {
+        const { status } = req.body; 
+        await User.findByIdAndUpdate(req.params.id, { status });
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
 // Admin: Delete User/Vendor (Maintenance)
 app.delete('/api/users/:id', async (req, res) => {
     await User.findByIdAndDelete(req.params.id);
