@@ -1,13 +1,14 @@
 // ============================================================
 //      CONFIG & STATE
 // ============================================================
-const API_URL = "https://event-api-ufe3.onrender.com/api"; // Change if your backend URL is different
+// 👇 REPLACE THIS WITH YOUR ACTUAL RENDER URL 👇
+const API_URL = "https://your-render-url.onrender.com/api"; 
 
 // State Management
 let currentUser = JSON.parse(localStorage.getItem('user')) || null;
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let products = []; // Local cache of fetched products
-let orders = [];   // Local cache of fetched orders
+let guests = [];   // Local cache for Guest List
 let users = [];    // Admin use only
 let vendors = [];  // Admin use only
 
@@ -40,16 +41,23 @@ function navigate(screenId) {
     if (screenId === 'screen-user-portal')    renderUserPortal();
     if (screenId === 'screen-products')       fetchAndRenderProducts();
     if (screenId === 'screen-cart')           renderCart();
+    
+    // Vendor Screens
     if (screenId === 'screen-vendor-dash')    renderVendorDash();
     if (screenId === 'screen-vendor-products') fetchVendorProducts();
     if (screenId === 'screen-vendor-orders')  fetchVendorOrders();
+    if (screenId === 'screen-add-product')    resetProductForm();
+    
+    // Admin Screens
     if (screenId === 'screen-admin-dash')     renderAdminDash();
     if (screenId === 'screen-maintain-users')    fetchUsers();
     if (screenId === 'screen-maintain-vendors') fetchVendors();
     if (screenId === 'screen-admin-orders')   fetchAllOrders();
+    
+    // User Features
     if (screenId === 'screen-order-status')   fetchUserOrders();
-    // if (screenId === 'screen-request-item')   fetchRequests(); // (Optional feature)
-    if (screenId === 'screen-add-product')    resetProductForm();
+    if (screenId === 'screen-request-item')   fetchRequests();
+    if (screenId === 'screen-guest-list')     fetchGuests(); // NEW
 }
 
 // ============================================================
@@ -58,8 +66,12 @@ function navigate(screenId) {
 
 function showErr(id, msg) {
     const el = document.getElementById(id);
-    el.textContent = msg; el.style.display = 'block';
-    setTimeout(() => el.style.display='none', 4000);
+    if(el) {
+        el.textContent = msg; el.style.display = 'block';
+        setTimeout(() => el.style.display='none', 4000);
+    } else {
+        alert(msg);
+    }
 }
 
 function validate(fields) {
@@ -111,8 +123,6 @@ async function handleSignup(role, body, errId, destScreen) {
     }
 }
 
-// --- Specific Auth Handlers ---
-
 function userLogin() { handleLogin('user', 'ul-email', 'ul-pass', 'user-login-err', 'screen-user-portal'); }
 function vendorLogin() { handleLogin('vendor', 'vl-email', 'vl-pass', 'vendor-login-err', 'screen-vendor-dash'); }
 function adminLogin() { handleLogin('admin', 'al-email', 'al-pass', 'admin-login-err', 'screen-admin-dash'); }
@@ -146,8 +156,7 @@ function vendorSignup() {
 function logout() {
     currentUser = null;
     cart = [];
-    localStorage.removeItem('user');
-    localStorage.removeItem('cart');
+    localStorage.clear();
     navigate('screen-landing');
 }
 
@@ -164,14 +173,16 @@ async function renderUserPortal() {
     const myOrds = await apiCall(`/orders/${currentUser._id}`);
     
     document.getElementById('user-stats').innerHTML = `
-        <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${prods.length || 0}</div><div class="stat-lbl">Products</div></div>
-        <div class="stat-card"><div class="stat-val" style="color:var(--accent3)">${myOrds.length || 0}</div><div class="stat-lbl">My Orders</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${Array.isArray(prods)?prods.length:0}</div><div class="stat-lbl">Products</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--accent3)">${Array.isArray(myOrds)?myOrds.length:0}</div><div class="stat-lbl">My Orders</div></div>
         <div class="stat-card"><div class="stat-val" style="color:var(--warning)">${cartCount()}</div><div class="stat-lbl">Cart Items</div></div>
     `;
     
     // Preview
-    const activeProds = prods.filter(p => p.status === 'active').slice(0, 4);
-    document.getElementById('user-product-preview').innerHTML = activeProds.map(p => productCardHTML(p)).join('');
+    if(Array.isArray(prods)){
+        const activeProds = prods.filter(p => p.status === 'active').slice(0, 4);
+        document.getElementById('user-product-preview').innerHTML = activeProds.map(p => productCardHTML(p)).join('');
+    }
 }
 
 // --- Product Browsing ---
@@ -180,13 +191,10 @@ let currentVendorFilter = null;
 async function fetchAndRenderProducts() {
     // 1. Fetch
     const data = await apiCall('/products');
-    products = data; // Cache global
+    products = Array.isArray(data) ? data : [];
     
     // 2. Build Vendor Tabs
-    // We need a unique list of vendorIds from products (since we don't have a specific get-all-vendors endpoint for users usually, but here we can improvise)
-    // Ideally, fetch vendors via API. For now, we will extract vendor IDs from products or fetch vendors if user is allowed.
-    // Let's assume we fetch all vendors for the filter tabs:
-    const allVendors = await apiCall('/vendors'); // Ensure this endpoint exists or mock it
+    const allVendors = await apiCall('/vendors'); 
     
     const tabsEl = document.getElementById('vendor-tabs');
     tabsEl.innerHTML = `<button class="tab-btn active" onclick="filterVendor(null,this)">All Vendors</button>`;
@@ -225,16 +233,10 @@ function renderProductsGrid() {
         grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>No products found.</p></div>'; 
         return; 
     }
-    
-    // Note: We pass 'products' to HTML generation, but we need vendor names.
-    // In a real app, product object should contain vendorName (populated by backend)
-    // or we look it up. For simplicity, we'll assume product has vendorName or ignore.
     grid.innerHTML = prods.map(p => productCardHTML(p)).join('');
 }
 
 function productCardHTML(p) {
-    // If your backend populates vendor name, use p.vendorName.
-    // Otherwise it might just show 'Vendor'.
     return `<div class="product-card" onclick="addToCart('${p._id}')">
         <div class="product-thumb">${p.image||'📦'}</div>
         <div class="product-info">
@@ -247,7 +249,7 @@ function productCardHTML(p) {
 }
 
 // ============================================================
-//      CART LOGIC (Local Storage based)
+//      CART LOGIC
 // ============================================================
 
 function addToCart(productId) {
@@ -269,9 +271,7 @@ function addToCart(productId) {
     setTimeout(()=>toast.remove(), 2500);
 }
 
-function saveCart() {
-    localStorage.setItem('cart', JSON.stringify(cart));
-}
+function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); }
 
 function updateCartBadge() {
     const c = cart.reduce((s,i) => s+i.qty, 0);
@@ -425,13 +425,63 @@ async function fetchUserOrders() {
 }
 
 // ============================================================
-//      REQUEST ITEM (Optional - Local only for now)
+//      NEW: GUEST LIST (User Branch)
+// ============================================================
+async function fetchGuests() {
+    if (!currentUser) return;
+    const data = await apiCall(`/guests/${currentUser._id}`);
+    guests = Array.isArray(data) ? data : [];
+    renderGuestList();
+}
+
+function renderGuestList() {
+    const el = document.getElementById('guest-list-container');
+    if (!el) return;
+    
+    if (!guests.length) { el.innerHTML = '<p style="text-align:center;color:#888;margin-top:20px">No guests added yet.</p>'; return; }
+    
+    el.innerHTML = guests.map(g => `
+        <div class="card-sm" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div>
+                <div style="font-weight:bold">${g.name}</div>
+                <div style="font-size:0.85rem;color:#888">${g.contact || 'No contact'}</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span class="badge badge-accent">${g.rsvpStatus||'Pending'}</span>
+                <button class="btn btn-danger btn-sm" onclick="deleteGuest('${g._id}')">Remove</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function addGuest() {
+    const name = document.getElementById('guest-name').value.trim();
+    const contact = document.getElementById('guest-contact').value.trim();
+    
+    if(!name) return alert("Guest Name is required");
+    
+    await apiCall('/guests', 'POST', { userId: currentUser._id, name, contact });
+    
+    document.getElementById('guest-name').value = '';
+    document.getElementById('guest-contact').value = '';
+    fetchGuests();
+}
+
+async function deleteGuest(id) {
+    if(confirm("Remove this guest from the list?")) {
+        await apiCall(`/guests/${id}`, 'DELETE');
+        fetchGuests();
+    }
+}
+
+// ============================================================
+//      REQUEST ITEM
 // ============================================================
 async function submitRequest() {
     const name = document.getElementById('req-name').value.trim();
     const desc = document.getElementById('req-desc').value.trim();
     const date = document.getElementById('req-date').value;
-    const targetVendor = document.getElementById('req-vendor').value; // Optional
+    const targetVendor = document.getElementById('req-vendor').value; 
 
     if (!name) return alert("Item name is required");
 
@@ -452,15 +502,12 @@ async function submitRequest() {
         document.getElementById('req-desc').value = '';
         document.getElementById('req-ok').style.display = 'block';
         setTimeout(() => document.getElementById('req-ok').style.display = 'none', 3000);
-        
-        // Refresh the list immediately
         fetchRequests(); 
     } else {
         alert("Failed to submit request");
     }
 }
 
-// Add this new function to fetch requests
 async function fetchRequests() {
     if (!currentUser) return;
     const myReqs = await apiCall(`/requests/${currentUser._id}`);
@@ -491,18 +538,13 @@ async function renderVendorDash() {
     if (!currentUser) return;
     document.getElementById('vendor-welcome').textContent = `Welcome, ${currentUser.name}!`;
     
-    // Fetch vendor specific data
-    // Note: In real app, create dedicated endpoints like /vendor/stats
     const allProds = await apiCall('/products');
-    const myProds = allProds.filter(p => p.vendorId === currentUser._id);
+    const myProds = Array.isArray(allProds) ? allProds.filter(p => p.vendorId === currentUser._id) : [];
     
-    // We can't easily get orders containing OUR products without a complex query
-    // For simplicity, we'll fetch all orders and filter client side (not performant for big apps)
     const allOrders = await apiCall('/orders');
-    const myOrders = allOrders.filter(o => o.items.some(i => i.productId && myProds.find(p => p._id === i.productId)));
+    const myOrders = Array.isArray(allOrders) ? allOrders.filter(o => o.items.some(i => i.productId && myProds.find(p => p._id === i.productId))) : [];
     
     const revenue = myOrders.reduce((acc, o) => {
-        // Calculate revenue only for my items in that order
         const myItemsRevenue = o.items.reduce((sum, item) => {
             return myProds.find(p => p._id === item.productId) ? sum + (item.price * item.qty) : sum;
         }, 0);
@@ -518,7 +560,7 @@ async function renderVendorDash() {
 
 async function fetchVendorProducts() {
     const allProds = await apiCall('/products');
-    const myProds = allProds.filter(p => p.vendorId === currentUser._id);
+    const myProds = Array.isArray(allProds) ? allProds.filter(p => p.vendorId === currentUser._id) : [];
     
     const el = document.getElementById('vendor-product-list');
     if (!myProds.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>No products yet.</p></div>'; return; }
@@ -543,7 +585,6 @@ function resetProductForm() {
 }
 
 async function editProduct(id) {
-    // Ideally fetch specific product, but we have cache
     const all = await apiCall('/products');
     const p = all.find(x => x._id === id);
     if (!p) return;
@@ -570,10 +611,8 @@ async function saveProduct() {
 
     let res;
     if (id) {
-        // Update (ensure backend has PUT route)
         res = await apiCall(`/products/${id}`, 'PUT', productData);
     } else {
-        // Create
         res = await apiCall('/products', 'POST', productData);
     }
 
@@ -589,11 +628,11 @@ async function deleteProduct(id) {
 
 async function fetchVendorOrders() {
     const allOrders = await apiCall('/orders');
-    // Filter orders containing my products
-    const myProds = (await apiCall('/products')).filter(p => p.vendorId === currentUser._id);
+    const allProds = await apiCall('/products');
+    const myProds = Array.isArray(allProds) ? allProds.filter(p => p.vendorId === currentUser._id) : [];
     const myProdIds = myProds.map(p => p._id);
     
-    const myOrders = allOrders.filter(o => o.items.some(i => myProdIds.includes(i.productId)));
+    const myOrders = Array.isArray(allOrders) ? allOrders.filter(o => o.items.some(i => myProdIds.includes(i.productId))) : [];
 
     const el = document.getElementById('vendor-orders-table');
     const statuses = ['Received','Ready for Shipping','Shipped','Delivered'];
@@ -621,7 +660,7 @@ async function updateOrderStatus(id, status) {
 }
 
 // ============================================================
-//      ADMIN DASHBOARD
+//      ADMIN DASHBOARD (Updated with Membership Logic)
 // ============================================================
 
 async function renderAdminDash() {
@@ -630,48 +669,69 @@ async function renderAdminDash() {
     const p = await apiCall('/products');
     const o = await apiCall('/orders');
     
-    const revenue = o.reduce((s,x) => s + (x.total||0), 0);
+    const usersCount = Array.isArray(u) ? u.length : 0;
+    const vendorsCount = Array.isArray(v) ? v.length : 0;
+    const productsCount = Array.isArray(p) ? p.length : 0;
+    const ordersCount = Array.isArray(o) ? o.length : 0;
+    const revenue = Array.isArray(o) ? o.reduce((s,x) => s + (x.total||0), 0) : 0;
 
     document.getElementById('admin-stats').innerHTML = `
-        <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${u.length}</div><div class="stat-lbl">Users</div></div>
-        <div class="stat-card"><div class="stat-val" style="color:var(--accent2)">${v.length}</div><div class="stat-lbl">Vendors</div></div>
-        <div class="stat-card"><div class="stat-val" style="color:var(--accent3)">${p.length}</div><div class="stat-lbl">Products</div></div>
-        <div class="stat-card"><div class="stat-val" style="color:var(--warning)">${o.length}</div><div class="stat-lbl">Orders</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${usersCount}</div><div class="stat-lbl">Users</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--accent2)">${vendorsCount}</div><div class="stat-lbl">Vendors</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--accent3)">${productsCount}</div><div class="stat-lbl">Products</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--warning)">${ordersCount}</div><div class="stat-lbl">Orders</div></div>
         <div class="stat-card"><div class="stat-val" style="color:var(--success)">₹${revenue.toLocaleString()}</div><div class="stat-lbl">Revenue</div></div>
     `;
 }
 
 async function fetchUsers() {
-    users = await apiCall('/users'); // Ensure endpoint exists
-    renderUsersTable();
-}
-
-function renderUsersTable() {
-    document.getElementById('users-table').innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>City</th><th>Status</th></tr></thead><tbody>` +
-    users.map(u => `<tr>
-        <td>${u.name}</td><td>${u.email}</td><td>${u.city||'—'}</td>
-        <td><span class="badge ${u.status==='active'?'badge-success':'badge-danger'}">${u.status||'active'}</span></td>
-    </tr>`).join('') + `</tbody></table>`;
+    users = await apiCall('/users');
+    const el = document.getElementById('users-table');
+    el.innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Action</th></tr></thead><tbody>` +
+    (Array.isArray(users) ? users.map(u => `<tr>
+        <td>${u.name}</td><td>${u.email}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}')">Remove</button></td>
+    </tr>`).join('') : '') + `</tbody></table>`;
 }
 
 async function fetchVendors() {
     vendors = await apiCall('/vendors');
-    document.getElementById('vendors-table').innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead><tbody>` +
-    vendors.map(v => `<tr>
-        <td>${v.name}</td><td>${v.email}</td>
-        <td><span class="badge ${v.status==='active'?'badge-success':'badge-danger'}">${v.status||'active'}</span></td>
-    </tr>`).join('') + `</tbody></table>`;
+    const el = document.getElementById('vendors-table');
+    el.innerHTML = `<table><thead><tr><th>Name</th><th>Membership</th><th>Action</th></tr></thead><tbody>` +
+    (Array.isArray(vendors) ? vendors.map(v => `<tr>
+        <td>${v.name}</td>
+        <td><span class="badge ${v.membershipId ? 'badge-success':'badge-warning'}">${v.membershipId ? 'Premium' : 'Standard'}</span></td>
+        <td>
+            <button class="btn btn-primary btn-sm" onclick="assignMembership('${v._id}')">Upgrade</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteUser('${v._id}')">Remove</button>
+        </td>
+    </tr>`).join('') : '') + `</tbody></table>`;
+}
+
+async function deleteUser(id) {
+    if(confirm("Permanently delete this user/vendor?")) {
+        await apiCall(`/users/${id}`, 'DELETE');
+        fetchUsers();
+        fetchVendors();
+    }
+}
+
+async function assignMembership(vendorId) {
+    if(confirm("Upgrade this vendor to Premium Membership (30 days)?")) {
+        await apiCall(`/users/${vendorId}/membership`, 'PUT', { membershipId: 'premium_tier' });
+        fetchVendors();
+    }
 }
 
 async function fetchAllOrders() {
     const ords = await apiCall('/orders');
     const el = document.getElementById('admin-orders-table');
     el.innerHTML = `<table><thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Date</th><th>Status</th></tr></thead><tbody>` +
-    ords.map(o => `<tr>
+    (Array.isArray(ords) ? ords.map(o => `<tr>
         <td style="font-family:monospace;font-size:.8rem">${o._id.slice(-6)}</td>
         <td>${o.userName}</td>
         <td>₹${o.total.toLocaleString()}</td>
         <td style="font-size:.82rem">${new Date(o.createdAt).toLocaleDateString()}</td>
         <td><span class="badge badge-accent">${o.status}</span></td>
-    </tr>`).join('') + `</tbody></table>`;
+    </tr>`).join('') : '') + `</tbody></table>`;
 }

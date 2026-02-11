@@ -33,6 +33,10 @@ html, body {
   overflow-x: hidden;
 }
 
+/* Utilities */
+.text-center { text-align: center; }
+.text-dim { color: var(--text-dim); }
+
 /* =========================================
    2. SCREEN SYSTEM (SPA LOGIC)
    ========================================= */

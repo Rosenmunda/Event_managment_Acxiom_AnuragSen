@@ -152,6 +152,7 @@
     <div class="nav-actions">
       <button class="btn-nav" onclick="navigate('screen-user-portal')">🏠 Home</button>
       <button class="btn-nav" onclick="navigate('screen-products')">🛍 Vendors</button>
+      <button class="btn-nav" onclick="navigate('screen-guest-list')">👥 Guests</button>
       <button class="btn-nav" onclick="showCart()">🛒 Cart <span id="cart-badge" style="background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-size:.75rem"></span></button>
       <button class="btn-nav" onclick="navigate('screen-order-status')">📦 Orders</button>
       <button class="btn-nav" onclick="navigate('screen-request-item')">📋 Requests</button>
@@ -174,6 +175,32 @@
   </div>
 </div>
 
+<div id="screen-guest-list" class="screen">
+  <nav class="topnav">
+    <div class="logo">Event<span>MS</span></div>
+    <div class="nav-actions">
+      <button class="btn-nav" onclick="navigate('screen-user-portal')">🏠 Home</button>
+      <button class="btn-ghost" onclick="logout()">Log Out</button>
+    </div>
+  </nav>
+  <div class="page-body">
+    <h1>Guest List</h1>
+    <p class="subtext">Manage your event invitees and their status.</p>
+    
+    <div class="card">
+      <h3>Add New Guest</h3>
+      <div class="grid-2">
+        <div class="form-group"><label>Name</label><input class="form-control" id="guest-name" placeholder="Guest Name"></div>
+        <div class="form-group"><label>Contact</label><input class="form-control" id="guest-contact" placeholder="Contact / Email"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addGuest()">+ Add to List</button>
+    </div>
+
+    <h3 style="margin-top:24px">My Guests</h3>
+    <div id="guest-list-container"></div>
+  </div>
+</div>
+
 <div id="screen-products" class="screen">
   <nav class="topnav">
     <div class="logo">Event<span>MS</span></div>
@@ -193,7 +220,7 @@
 
     <div class="search-bar">
       <span class="search-icon">🔍</span>
-      <input placeholder="Search products..." id="product-search" oninput="renderProducts()">
+      <input placeholder="Search products..." id="product-search" oninput="renderProductsGrid()">
     </div>
 
     <div class="product-grid" id="products-grid"></div>
@@ -343,7 +370,7 @@
 <div id="screen-add-product" class="screen">
   <nav class="topnav">
     <div class="logo">Event<span>MS</span></div>
-    <div class="nav-actions"><button class="btn-nav" onclick="navigate('screen-vendor-products'); renderVendorProducts()">← Products</button></div>
+    <div class="nav-actions"><button class="btn-nav" onclick="navigate('screen-vendor-products'); fetchVendorProducts()">← Products</button></div>
   </nav>
   <div class="page-body">
     <h1 id="add-prod-title">Add New Product</h1>
@@ -361,7 +388,7 @@
       <div class="form-group"><label>Product Emoji / Icon</label><input class="form-control" id="ap-image" placeholder="Paste an emoji e.g. 🎙️"></div>
       <div class="btn-group">
         <button class="btn btn-primary" onclick="saveProduct()">Save Product</button>
-        <button class="btn btn-secondary" onclick="navigate('screen-vendor-products'); renderVendorProducts()">Cancel</button>
+        <button class="btn btn-secondary" onclick="navigate('screen-vendor-products'); fetchVendorProducts()">Cancel</button>
       </div>
     </div>
   </div>
