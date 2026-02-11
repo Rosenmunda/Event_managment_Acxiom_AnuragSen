@@ -150,34 +150,74 @@ app.get('/api/vendors', async (req, res) => {
     res.json(vendors);
 });
 
-// 🔥 SEED ROUTE (RUN THIS ONCE TO FIX EMPTY DB) 🔥
+// ================================================================
+// 4. DATABASE SEEDER (SAFE VERSION - NO DELETION)
+// ================================================================
 app.get('/api/seed', async (req, res) => {
     try {
-        await User.deleteMany({});
-        await Product.deleteMany({});
+        let messages = [];
+
+        // 1. Check & Create Admin
+        const adminExists = await User.findOne({ email: 'admin@ems.com' });
+        if (!adminExists) {
+            const admin = new User({ 
+                name: 'Super Admin', email: 'admin@ems.com', pass: 'admin123', role: 'admin', status: 'active' 
+            });
+            await admin.save();
+            messages.push("✅ Created Admin (admin@ems.com)");
+        } else {
+            messages.push("ℹ️ Admin already exists.");
+        }
+
+        // 2. Check & Create Default Vendor
+        const vendorExists = await User.findOne({ email: 'tech@baz.com' });
+        let vendorId = vendorExists ? vendorExists._id : null;
         
-        // 1. Create Admin
-        const admin = new User({ name: 'Super Admin', email: 'admin@ems.com', pass: 'admin123', role: 'admin' });
-        await admin.save();
+        if (!vendorExists) {
+            const vendor = new User({ 
+                name: 'TechBazaar', email: 'tech@baz.com', pass: 'pass123', role: 'vendor', contact: '9876543210', address: '22 MG Road', status: 'active' 
+            });
+            const savedVendor = await vendor.save();
+            vendorId = savedVendor._id;
+            messages.push("✅ Created Vendor (tech@baz.com)");
+        } else {
+            messages.push("ℹ️ Default Vendor already exists.");
+        }
 
-        // 2. Create Vendor
-        const vendor = new User({ name: 'TechBazaar', email: 'tech@baz.com', pass: 'pass123', role: 'vendor', contact: '9876543210', address: '22 MG Road' });
-        await vendor.save();
+        // 3. Check & Create Default User
+        const userExists = await User.findOne({ email: 'alice@mail.com' });
+        if (!userExists) {
+            const user = new User({ 
+                name: 'Alice Kumar', email: 'alice@mail.com', pass: 'pass123', role: 'user', address: '12 Park St', city: 'Kolkata', status: 'active' 
+            });
+            await user.save();
+            messages.push("✅ Created User (alice@mail.com)");
+        } else {
+            messages.push("ℹ️ Default User already exists.");
+        }
 
-        // 3. Create User
-        const user = new User({ name: 'Alice Kumar', email: 'alice@mail.com', pass: 'pass123', role: 'user', address: '12 Park St', city: 'Kolkata' });
-        await user.save();
+        // 4. Create Sample Products (Only if Vendor was just created or products are empty)
+        const productCount = await Product.countDocuments();
+        if (productCount === 0 && vendorId) {
+            await Product.create([
+                { vendorId: vendorId.toString(), name: 'LED Stage Light', price: 1200, category: 'Lighting', image: '💡', status: 'active' },
+                { vendorId: vendorId.toString(), name: 'Wireless Mic Set', price: 3500, category: 'Audio', image: '🎙️', status: 'active' },
+                { vendorId: vendorId.toString(), name: 'Event Backdrop', price: 2800, category: 'Decor', image: '🎪', status: 'active' }
+            ]);
+            messages.push("✅ Created 3 Sample Products");
+        } else {
+            messages.push("ℹ️ Products already exist.");
+        }
 
-        // 4. Create Products (Linked to the new Vendor ID)
-        await Product.create([
-            { vendorId: vendor._id, name: 'LED Stage Light', price: 1200, category: 'Lighting', image: '💡' },
-            { vendorId: vendor._id, name: 'Wireless Mic Set', price: 3500, category: 'Audio', image: '🎙️' },
-            { vendorId: vendor._id, name: 'Event Backdrop', price: 2800, category: 'Decor', image: '🎪' }
-        ]);
-
-        res.send("✅ Database seeded! Admin: admin@ems.com / admin123");
+        res.send(`
+            <h1>Database Status</h1>
+            <ul>${messages.map(m => `<li>${m}</li>`).join('')}</ul>
+            <p><strong>Admin Login:</strong> admin@ems.com / admin123</p>
+            <br>
+            <a href="/">Go Back</a>
+        `);
     } catch (err) {
-        res.status(500).send("Error seeding: " + err.message);
+        res.status(500).send("Error seeding database: " + err.message);
     }
 });
 
