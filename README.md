@@ -8,8 +8,8 @@ A full-stack MERN web application designed to streamline the planning and execut
 ---
 
 ## 🚀 Live Demo
-- **Frontend:** [[https://your-netlify-app-url.netlify.app](https://acxiom-event-managment-raag.netlify.app/)](https://acxiom-event-managment-raag.netlify.app/)
-- **Backend API:** [[https://your-render-url.onrender.com](https://event-api-ufe3.onrender.com/api/)](https://event-api-ufe3.onrender.com/api/)
+- **Frontend:** (https://acxiom-event-managment-raag.netlify.app/)
+- **Backend API:** (https://event-api-ufe3.onrender.com/api/)
 
 ---
 
