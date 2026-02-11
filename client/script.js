@@ -427,10 +427,60 @@ async function fetchUserOrders() {
 // ============================================================
 //      REQUEST ITEM (Optional - Local only for now)
 // ============================================================
-function submitRequest() {
-    // Implement API call here if Request schema exists on backend
-    document.getElementById('req-ok').style.display = 'block';
-    setTimeout(()=>document.getElementById('req-ok').style.display='none', 3000);
+async function submitRequest() {
+    const name = document.getElementById('req-name').value.trim();
+    const desc = document.getElementById('req-desc').value.trim();
+    const date = document.getElementById('req-date').value;
+    const targetVendor = document.getElementById('req-vendor').value; // Optional
+
+    if (!name) return alert("Item name is required");
+
+    const requestData = {
+        userId: currentUser._id,
+        userName: currentUser.name,
+        itemName: name,
+        desc: desc,
+        neededBy: date,
+        targetVendorId: targetVendor,
+        status: 'Pending'
+    };
+
+    const res = await apiCall('/requests', 'POST', requestData);
+
+    if (res.success) {
+        document.getElementById('req-name').value = '';
+        document.getElementById('req-desc').value = '';
+        document.getElementById('req-ok').style.display = 'block';
+        setTimeout(() => document.getElementById('req-ok').style.display = 'none', 3000);
+        
+        // Refresh the list immediately
+        fetchRequests(); 
+    } else {
+        alert("Failed to submit request");
+    }
+}
+
+// Add this new function to fetch requests
+async function fetchRequests() {
+    if (!currentUser) return;
+    const myReqs = await apiCall(`/requests/${currentUser._id}`);
+    const el = document.getElementById('my-requests-list');
+    
+    if (!myReqs || !myReqs.length) { 
+        el.innerHTML = '<div class="empty-state"><p>No requests yet.</p></div>'; 
+        return; 
+    }
+    
+    el.innerHTML = myReqs.map(r => `
+        <div class="card-sm" style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between">
+                <strong>${r.itemName}</strong>
+                <span class="badge badge-warning">${r.status}</span>
+            </div>
+            <div style="color:var(--text-dim);font-size:.85rem;margin-top:5px">${r.desc||''}</div>
+            <div style="color:var(--text-faint);font-size:.78rem;margin-top:4px">Needed by: ${r.neededBy||'N/A'}</div>
+        </div>
+    `).join('');
 }
 
 // ============================================================
