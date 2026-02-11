@@ -1,7 +1,7 @@
 // ============================================================
 //      CONFIG & STATE
 // ============================================================
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://event-api-ufe3.onrender.com/api"; // Change if your backend URL is different
 
 // State Management
 let currentUser = JSON.parse(localStorage.getItem('user')) || null;
