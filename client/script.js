@@ -2,7 +2,7 @@
 //      CONFIG & STATE
 // ============================================================
 // 👇 REPLACE THIS WITH YOUR ACTUAL RENDER URL 👇
-const API_URL = "https://your-render-url.onrender.com/api"; 
+const API_URL = "https://event-api-ufe3.onrender.com/api/"; 
 
 // State Management
 let currentUser = JSON.parse(localStorage.getItem('user')) || null;
