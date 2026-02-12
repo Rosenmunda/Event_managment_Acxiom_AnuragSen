@@ -8,7 +8,7 @@ A full-stack MERN web application designed to streamline the planning and execut
 ---
 
 ## 🚀 Live Demo
-- **Frontend:** (https://event-managment-acxiom-anurag-blrpq83gf-rosenmundas-projects.vercel.app/)
+- **Frontend:** (https://event-managment-acxiom-anurag-sen.vercel.app/)
 - **Backend API:** (https://event-api-ufe3.onrender.com/api/)
 
 ---
@@ -56,6 +56,7 @@ EventManagementSystem/
     ├── server.js        # Express App & Routes
     ├── package.json     # Dependencies
     └── .env             # Environment Variables (Not committed)
+
 
 
 
